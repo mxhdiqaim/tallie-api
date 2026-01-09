@@ -1,10 +1,10 @@
-import "./config/instrument";
+// import "./config/instrument";
 import * as Sentry from "@sentry/node";
 import cors from "cors";
 import express from "express";
 import http from "http";
 import morgan from "morgan";
-import "./config/auth-config";
+// import "./config/auth-config";
 import path from "path";
 import configureSession from "./config/session-config";
 import routes from "./routes";

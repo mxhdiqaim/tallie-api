@@ -1,8 +1,7 @@
 {
   "name": "tallie-api",
   "version": "1.0.0",
-  "description": "",
-  "main": "dist/main.js",
+  "main": "main.ts",
   "scripts": {
     "dev": "nodemon",
     "build": "tsc",
@@ -16,6 +15,7 @@
     "predeploy": "pnpm run migrate:prod"
   },
   "keywords": [],
+  "description": "",
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.12.1",
@@ -37,6 +37,7 @@
     "redis": "^5.10.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -47,9 +48,12 @@
     "@types/pg": "^8.16.0",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9.39.2",
+    "globals": "^17.0.0",
+    "jiti": "^2.6.1",
     "nodemon": "^3.1.11",
     "prettier": "^3.7.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.52.0"
   }
 }
