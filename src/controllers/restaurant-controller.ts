@@ -9,6 +9,10 @@ import {handleError} from "../service/error-handling";
 import {DateTime} from "luxon";
 import {reservations} from "../schema/reservation-schema";
 
+/**
+ * @description Get all restaurants
+ * @route GET /api/v1/restaurants
+ */
 export const getAllRestaurants = async (req: CustomRequest, res: Response) => {
     try {
         const allRestaurants = await db.select().from(restaurants);

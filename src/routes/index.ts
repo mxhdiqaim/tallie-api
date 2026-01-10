@@ -14,8 +14,8 @@ router.get("/health", (_req, res) => {
     });
 });
 
-router.use("/restaurant", restaurants)
-router.use("/reservation", reservations)
+router.use("/restaurants", restaurants)
+router.use("/reservations", reservations)
 router.use("/availability", availability)
 
 export default router;
