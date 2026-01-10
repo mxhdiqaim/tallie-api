@@ -23,14 +23,14 @@ done
 
 echo "Redis is ready."
 
-#echo "Running database migrations..."
-#
-## Run database migrations
-#pnpm run migrate
-#
+echo "Running database migrations..."
+
+# Run database migrations
+pnpm run migrate
+
 ## Run database seeds
 #pnpm run seed
-#
-#echo "Migrations complete. Starting the API server..."
+
+echo "Migrations complete. Starting the API server..."
 
 exec pnpm run dev
