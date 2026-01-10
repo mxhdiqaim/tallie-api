@@ -9,6 +9,7 @@ import { isTableBusy } from "../service/is-table-busy";
 import { reservations } from "../schema/reservation-schema";
 import { StatusCodes } from "http-status-codes";
 import { handleError } from "../service/error-handling";
+import {ReservationStatusEnum} from "../types/enums";
 
 
 /**
@@ -53,6 +54,53 @@ export const getCustomerReservations = async (req: CustomRequest, res: Response)
         res.status(StatusCodes.OK).json(results);
     } catch (error) {
         handleError(res, "Failed to fetch customer reservations", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
+    }
+};
+
+/**
+ * @description Modify a reservation (Update status, time, or party size)
+ * @route PATCH /api/v1/reservations/:id
+ */
+export const updateReservation = async (req: CustomRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { partySize, startTimeISO, durationMinutes } = req.body;
+
+        // Fetch existing reservation
+        const [existing] = await db.select().from(reservations).where(eq(reservations.id, id));
+        if (!existing) return handleError(res, "Reservation not found", StatusCodes.NOT_FOUND);
+
+        const updateData: any = {};
+
+        // Handle Status Update
+        // if (reservationStatus) updateData.reservationStatus = reservationStatus;
+
+        // Handle Time/Capacity Changes
+        if (startTimeISO || partySize || durationMinutes) {
+            const newStart = startTimeISO ? DateTime.fromISO(startTimeISO) : DateTime.fromJSDate(existing.startTime);
+            const newDuration = durationMinutes ||
+                DateTime.fromJSDate(existing.endTime).diff(DateTime.fromJSDate(existing.startTime), 'minutes').minutes;
+            const newEnd = newStart.plus({ minutes: newDuration });
+            const newSize = partySize || existing.partySize;
+
+            // Check if the table is still free for the NEW time (excluding this reservation itself)
+            const busy = await isTableBusy(existing.tableId, newStart.toJSDate(), newEnd.toJSDate(), id);
+
+            if (busy) return handleError(res, "The table is already booked for this new time", StatusCodes.CONFLICT);
+
+            updateData.startTime = newStart.toJSDate();
+            updateData.endTime = newEnd.toJSDate();
+            updateData.partySize = newSize;
+        }
+
+        const [updated] = await db.update(reservations)
+            .set(updateData)
+            .where(eq(reservations.id, id))
+            .returning();
+
+        res.status(StatusCodes.OK).json(updated);
+    } catch (error) {
+        handleError(res, "Update failed", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
     }
 };
 
@@ -171,5 +219,26 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
             StatusCodes.INTERNAL_SERVER_ERROR,
             error instanceof Error ? error : undefined
         );
+    }
+};
+
+/**
+ * @description Cancel a reservation (Soft cancel by updating status)
+ * @route DELETE /api/v1/reservation/:id
+ */
+export const cancelReservation = async (req: CustomRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        const [cancelled] = await db.update(reservations)
+            .set({ reservationStatus: ReservationStatusEnum.CANCELLED })
+            .where(eq(reservations.id, id))
+            .returning();
+
+        if (!cancelled) return handleError(res, "Reservation not found", StatusCodes.NOT_FOUND);
+
+        res.status(StatusCodes.OK).json({ message: "Reservation cancelled", data: cancelled });
+    } catch (error) {
+        handleError(res, "Cancellation failed", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
     }
 };

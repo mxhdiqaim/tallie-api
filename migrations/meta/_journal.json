@@ -15,6 +15,13 @@
       "when": 1768045890368,
       "tag": "0001_amusing_onslaught",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768066344212,
+      "tag": "0002_tan_punisher",
+      "breakpoints": true
     }
   ]
 }

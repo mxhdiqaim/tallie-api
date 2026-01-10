@@ -1,18 +1,21 @@
-import { and, lt, gt, eq } from "drizzle-orm";
+import {and, lt, gt, eq, not} from "drizzle-orm";
 import db from "../db";
 import {reservations} from "../schema/reservation-schema";
+import {ReservationStatusEnum} from "../types/enums";
 
-export const isTableBusy = async (tableId: string, start: Date, end: Date) => {
-    const overlapping = await db.select()
-        .from(reservations)
-        .where(
-            and(
-                eq(reservations.tableId, tableId),
-                lt(reservations.startTime, end), // Existing start is before the new end
-                gt(reservations.endTime, start)  // Existing end is after a new start
-            )
-        )
-        .limit(1);
+export const isTableBusy = async (tableId: string, start: Date, end: Date, excludeId?: string) => {
+    const filters = [
+        eq(reservations.tableId, tableId),
+        lt(reservations.startTime, end),
+        gt(reservations.endTime, start),
+        // Filter out 'cancelled' bookings so they don't block slots!
+        not(eq(reservations.reservationStatus, ReservationStatusEnum.CANCELLED))
+    ];
 
+    if (excludeId) {
+        filters.push(not(eq(reservations.id, excludeId)));
+    }
+
+    const overlapping = await db.select().from(reservations).where(and(...filters)).limit(1);
     return overlapping.length > 0;
-}
+};
