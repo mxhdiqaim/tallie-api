@@ -16,18 +16,17 @@ export const checkAvailability = async (req: CustomRequest, res: Response) => {
     try {
         const { restaurantId, date, partySize, duration } = req.query;
 
-        if (!restaurantId || !date || !partySize) {
+        if (!restaurantId || !partySize) {
             return handleError(res, "Missing parameters", StatusCodes.BAD_REQUEST);
         }
 
-        const slots = await getAvailableSlots(
+        const result = await getAvailableSlots(
             restaurantId as string,
-            date as string,
-            parseInt(partySize as string),
-            parseInt(duration as string || "60") // Default to 1 hour
+            Number(partySize),
+            Number(duration),
+            date as string // Works if undefined
         );
-
-        res.json({ date, partySize, availableSlots: slots });
+        res.json({ date, partySize, availableSlots: result });
     } catch (error) {
         handleError(res, "Could not calculate availability", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
     }

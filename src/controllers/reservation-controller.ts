@@ -2,7 +2,7 @@ import { Response } from "express";
 import { DateTime } from 'luxon';
 import { CustomRequest } from "../types/express";
 import { restaurants } from "../schema/restaurant-schema";
-import { and, eq, gt } from "drizzle-orm";
+import {and, eq, gte} from "drizzle-orm";
 import db from "../db";
 import { tables } from "../schema/table-schema";
 import { isTableBusy } from "../service/is-table-busy";
@@ -74,12 +74,17 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
             .where(
                 and(
                     eq(tables.restaurantId, restaurantId),
-                    gt(tables.capacity, partySize - 1)
+                    gte(tables.capacity, partySize)
                 )
-            );
+            )
+            .orderBy(tables.capacity); // Tries to fill the smallest suitable table first
 
         if (potentialTables.length === 0) {
-            return handleError(res, "No tables in this restaurant can accommodate this party size", StatusCodes.BAD_REQUEST);
+            return handleError(
+                res,
+                `This restaurant does not have any tables that can accommodate party ${partySize} size.`,
+                StatusCodes.BAD_REQUEST
+            );
         }
 
         // Availability Check (Double-Booking Prevention)
