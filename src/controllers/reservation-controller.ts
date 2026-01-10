@@ -2,13 +2,59 @@ import { Response } from "express";
 import { DateTime } from 'luxon';
 import { CustomRequest } from "../types/express";
 import { restaurants } from "../schema/restaurant-schema";
-import {and, eq, gte} from "drizzle-orm";
+import {and, desc, eq, gte} from "drizzle-orm";
 import db from "../db";
 import { tables } from "../schema/table-schema";
 import { isTableBusy } from "../service/is-table-busy";
 import { reservations } from "../schema/reservation-schema";
 import { StatusCodes } from "http-status-codes";
 import { handleError } from "../service/error-handling";
+
+
+/**
+ * @description Get all reservations for a customer by phone number
+ * @route GET /api/v1/reservations/customer/:phone
+ */
+export const getCustomerReservations = async (req: CustomRequest, res: Response) => {
+    try {
+        const { phone } = req.params;
+
+        if (!phone) {
+            return handleError(res, "Phone number is required", StatusCodes.BAD_REQUEST);
+        }
+        const { upcomingOnly } = req.query;
+
+        const queryFilters = [eq(reservations.customerPhone, phone)];
+
+        if (upcomingOnly === 'true') {
+            queryFilters.push(gte(reservations.startTime, DateTime.now().toJSDate()));
+        }
+
+        const results = await db.select({
+            reservationId: reservations.id,
+            startTime: reservations.startTime,
+            endTime: reservations.endTime,
+            partySize: reservations.partySize,
+            restaurantName: restaurants.name,
+            // Include other restaurant details if needed
+        })
+            .from(reservations)
+            .innerJoin(restaurants, eq(reservations.restaurantId, restaurants.id))
+            .where(and(...queryFilters))
+            .orderBy(desc(reservations.startTime)); // Newest first
+
+        if (results.length === 0) {
+            return res.status(StatusCodes.OK).json({
+                message: "No reservations found for this phone number",
+                data: []
+            });
+        }
+
+        res.status(StatusCodes.OK).json(results);
+    } catch (error) {
+        handleError(res, "Failed to fetch customer reservations", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
+    }
+};
 
 /**
  * @description Create a reservation with validation for hours, capacity, and double-booking
@@ -82,7 +128,7 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
         if (potentialTables.length === 0) {
             return handleError(
                 res,
-                `This restaurant does not have any tables that can accommodate party ${partySize} size.`,
+                `This restaurant does not have any tables that can accommodate party ${partySize} people.`,
                 StatusCodes.BAD_REQUEST
             );
         }

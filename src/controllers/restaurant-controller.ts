@@ -31,12 +31,11 @@ export const getRestaurantReservationsByDate = async (req: CustomRequest, res: R
         const { id: restaurantId } = req.params;
         const { date } = req.query;
 
-        if (!date) {
-            return handleError(res, "Date query parameter is required", StatusCodes.BAD_REQUEST);
-        }
+        const now = DateTime.now(); // Get the current time once
+        const effectiveDate = date || now.toISODate()!;
 
         // Force Luxon to interpret the date in UTC
-        const dayStart = DateTime.fromISO(date as string, { zone: 'utc' }).startOf('day');
+        const dayStart = DateTime.fromISO(effectiveDate as string, { zone: 'utc' }).startOf('day');
         const dayEnd = dayStart.endOf('day');
 
         if (!dayStart.isValid) {
