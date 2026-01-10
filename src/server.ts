@@ -1,10 +1,10 @@
 // import "./config/instrument";
-import * as Sentry from "@sentry/node";
+// import * as Sentry from "@sentry/node";
 import cors from "cors";
 import express from "express";
 import http from "http";
 import morgan from "morgan";
-// import "./config/auth-config";
+import "./config/auth-config";
 import path from "path";
 import configureSession from "./config/session-config";
 import routes from "./routes";
@@ -65,7 +65,7 @@ app.use("/api/v1", routes);
 app.use(express.static(path.join(__dirname, "public")));
 
 // Sentry Error Handler
-Sentry.setupExpressErrorHandler(app);
+// Sentry.setupExpressErrorHandler(app);
 
 /** Error handling */
 app.use((req, res, next) => {
