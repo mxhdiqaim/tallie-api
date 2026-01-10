@@ -11,6 +11,7 @@ import { StatusCodes } from "http-status-codes";
 import { handleError } from "../service/error-handling";
 import {ReservationStatusEnum} from "../types/enums";
 import {getPeakLimit} from "../helper";
+import {NotificationService} from "../service/notification-service";
 
 
 /**
@@ -185,6 +186,15 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
             reservationStatus: ReservationStatusEnum.CONFIRMED
         }).returning();
 
+        // Trigger Mock Notification
+        await NotificationService.send({
+            customerName: newBooking.customerName,
+            customerPhone: newBooking.customerPhone,
+            restaurantName: restaurant.name,
+            startTime: newBooking.startTime,
+            reservationStatus: newBooking.reservationStatus
+        });
+
         return res.status(StatusCodes.CREATED).json(newBooking);
 
     } catch (error) {
@@ -280,8 +290,17 @@ export const cancelReservation = async (req: CustomRequest, res: Response) => {
                     .set({ reservationStatus: ReservationStatusEnum.CONFIRMED, tableId: cancelled.tableId })
                     .where(eq(reservations.id, entry.id));
 
-                console.log(`Promoted customer ${entry.customerName} from waitlist.`);
-                break; // Only promote one person for this specific cancellation
+                // Fetch the restaurant name
+                const [rest] = await db.select().from(restaurants).where(eq(restaurants.id, entry.restaurantId));
+
+                // Trigger Promotion Alert
+                await NotificationService.sendPromotionAlert(
+                    entry.customerName,
+                    entry.customerPhone,
+                    rest.name
+                );
+
+                break;
             }
         }
 
