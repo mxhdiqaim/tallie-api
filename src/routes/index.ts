@@ -1,6 +1,7 @@
 import express from "express";
 import { StatusCodes } from "http-status-codes";
 import restaurants from "./restaurants-routes";
+import reservations from "./reservation-routes";
 
 const router = express.Router();
 
@@ -13,5 +14,6 @@ router.get("/health", (_req, res) => {
 });
 
 router.use("/restaurant", restaurants)
+router.use("/reservation", reservations)
 
 export default router;

@@ -1,6 +1,7 @@
 import * as restaurants from "../schema/restaurant-schema";
 import * as tables from "../schema/table-schema";
 import * as users from "../schema/user-schema";
+import * as reservations from "../schema/reservation-schema";
 
 import * as restaurantsRelation from "../schema/relations/restaurant-relation";
 import * as tablesRelation from "../schema/relations/table-relation";
@@ -14,6 +15,7 @@ const schema = {
     ...restaurants,
     ...tables,
     ...users,
+    ...reservations,
 
     ...relations
 };
