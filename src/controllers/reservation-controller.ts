@@ -10,6 +10,7 @@ import { reservations } from "../schema/reservation-schema";
 import { StatusCodes } from "http-status-codes";
 import { handleError } from "../service/error-handling";
 import {ReservationStatusEnum} from "../types/enums";
+import {getPeakLimit} from "../helper";
 
 
 /**
@@ -116,6 +117,17 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
         const requestedStart = DateTime.fromISO(startTimeISO);
         const requestedEnd = requestedStart.plus({ minutes: durationMinutes });
 
+        //  Validation: Duration vs Peak Hours
+        const maxAllowed = getPeakLimit(requestedStart);
+        if (durationMinutes > maxAllowed) {
+            return handleError(res, `Peak hour limit: ${maxAllowed} mins`, StatusCodes.BAD_REQUEST);
+        }
+
+        // if (durationMinutes < 45) {
+        //     return handleError(res, "Reservations must be at least 45 minutes.", StatusCodes.BAD_REQUEST);
+        // }
+
+
         if (!requestedStart.isValid) {
             return handleError(res, "Invalid date format in startTimeISO", StatusCodes.BAD_REQUEST);
         }
@@ -151,14 +163,8 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
             closeTime = closeTime.plus({ days: 1 });
         }
 
-        // Perform the check
-        const isWithinHours = requestedStart >= openTime && requestedEnd <= closeTime;
-        if (!isWithinHours) {
-            return handleError(
-                res,
-                `Restaurant is only open between ${restaurant.openingTime} and ${restaurant.closingTime}.`,
-                StatusCodes.BAD_REQUEST
-            );
+        if (requestedStart < openTime || requestedEnd > closeTime) {
+            return handleError(res, "Outside operating hours", StatusCodes.BAD_REQUEST);
         }
 
         // Find Suitable Tables (Capacity Check)
@@ -193,7 +199,7 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
         }
 
         if (!assignedTableId) {
-            return handleError(res, "The slot is not available at the current time.", StatusCodes.CONFLICT);
+            return handleError(res, "No tables available", StatusCodes.CONFLICT);
         }
 
         // Finalize Reservation
@@ -204,13 +210,11 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
             customerPhone: String(customerPhone), // Ensure it's stored as string
             partySize,
             startTime: requestedStart.toJSDate(),
-            endTime: requestedEnd.toJSDate()
+            endTime: requestedEnd.toJSDate(),
+            reservationStatus: ReservationStatusEnum.CONFIRMED
         }).returning();
 
-        return res.status(StatusCodes.CREATED).json({
-            message: "Reservation created successfully",
-            data: newBooking
-        });
+        return res.status(StatusCodes.CREATED).json(newBooking);
 
     } catch (error) {
         return handleError(
