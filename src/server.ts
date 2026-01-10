@@ -9,9 +9,12 @@ import path from "path";
 import configureSession from "./config/session-config";
 import routes from "./routes";
 import { getEnvVariable } from "./utils";
+import {initCronJobs} from "./service/cron-service";
 // import { initializeSentry } from "./config/sentry-config";
 
 export const app = express();
+
+initCronJobs();
 
 // Initialise Sentry
 // const SENTRY_DSN = getEnvVariable("SENTRY_DSN");
