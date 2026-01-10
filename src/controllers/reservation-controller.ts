@@ -11,9 +11,9 @@ import { StatusCodes } from "http-status-codes";
 import {handleError} from "../service/error-handling";
 
 /*
-    * @description Create a reservation
-    * @route POST /api/v1/reservation/create
-*/
+ * @description Create a reservation
+ * @route POST /api/v1/reservation/create
+ */
 export const createReservation = async (req: CustomRequest, res: Response) => {
     try {
         const { restaurantId, partySize, startTimeISO, durationMinutes, customerName, customerPhone } = req.body;

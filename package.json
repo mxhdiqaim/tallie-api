@@ -12,7 +12,8 @@
     "migrate:prod": "node dist/src/db/migrate.js",
     "seed": "ts-node src/db/seed.ts",
     "seed:prod": "node dist/src/db/seed.js",
-    "predeploy": "pnpm run migrate:prod"
+    "predeploy": "pnpm run migrate:prod",
+    "test": "jest --runInBand"
   },
   "keywords": [],
   "description": "",
@@ -48,6 +49,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.18.2",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/luxon": "^3.7.1",
     "@types/morgan": "^1.9.10",
@@ -56,12 +58,15 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/pg": "^8.16.0",
+    "@types/supertest": "^6.0.3",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9.39.2",
     "globals": "^17.0.0",
+    "jest": "^30.2.0",
     "jiti": "^2.6.1",
     "nodemon": "^3.1.11",
     "prettier": "^3.7.4",
+    "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.52.0"

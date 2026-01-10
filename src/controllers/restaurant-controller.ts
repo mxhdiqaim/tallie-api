@@ -4,9 +4,65 @@ import {restaurants} from "../schema/restaurant-schema";
 import { StatusCodes } from "http-status-codes";
 import { Response } from "express";
 import {tables} from "../schema/table-schema";
-import {and, eq} from "drizzle-orm";
+import {and, eq, gte, lte} from "drizzle-orm";
 import {handleError} from "../service/error-handling";
+import {DateTime} from "luxon";
+import {reservations} from "../schema/reservation-schema";
 
+export const getAllRestaurants = async (req: CustomRequest, res: Response) => {
+    try {
+        const allRestaurants = await db.select().from(restaurants);
+        res.status(StatusCodes.OK).json(allRestaurants);
+    } catch (error) {
+        handleError(res, "Failed to fetch restaurants", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
+    }
+};
+
+/**
+ * @description Get all reservations for a restaurant on a specific date
+ * @route GET /api/v1/restaurants/:id/reservations?date=YYYY-MM-DD
+ */
+export const getRestaurantReservationsByDate = async (req: CustomRequest, res: Response) => {
+    try {
+        const { id: restaurantId } = req.params;
+        const { date } = req.query;
+
+        if (!date) {
+            return handleError(res, "Date query parameter is required", StatusCodes.BAD_REQUEST);
+        }
+
+        // Force Luxon to interpret the date in UTC
+        const dayStart = DateTime.fromISO(date as string, { zone: 'utc' }).startOf('day');
+        const dayEnd = dayStart.endOf('day');
+
+        if (!dayStart.isValid) {
+            return handleError(res, "Invalid date format. Use YYYY-MM-DD", StatusCodes.BAD_REQUEST);
+        }
+
+        // Query the database
+        const results = await db.select({
+            id: reservations.id,
+            customerName: reservations.customerName,
+            startTime: reservations.startTime,
+            partySize: reservations.partySize,
+            tableNumber: tables.tableNumber, // From joined table
+            capacity: tables.capacity
+        })
+            .from(reservations)
+            .innerJoin(tables, eq(reservations.tableId, tables.id))
+            .where(
+                and(
+                    eq(reservations.restaurantId, restaurantId),
+                    gte(reservations.startTime, dayStart.toJSDate()),
+                    lte(reservations.startTime, dayEnd.toJSDate())
+                )
+            );
+
+        res.status(StatusCodes.OK).json(results);
+    } catch (error) {
+        handleError(res, "Failed to fetch reservations", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
+    }
+};
 
 /*
     * @description Get all tables for a specific restaurant

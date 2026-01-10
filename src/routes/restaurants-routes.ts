@@ -3,7 +3,9 @@ import * as controller from "../controllers/restaurant-controller";
 
 const router = express.Router();
 
+router.get("/", controller.getAllRestaurants);
 router.get("/:id/tables", controller.getAllRestaurantTables);
+router.get("/:id/reservations", controller.getRestaurantReservationsByDate);
 router.post("/create", controller.createRestaurant);
 router.post("/:id/add-table", controller.addTableToRestaurant);
 
