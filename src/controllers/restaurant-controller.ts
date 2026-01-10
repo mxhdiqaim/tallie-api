@@ -4,7 +4,7 @@ import {restaurants} from "../schema/restaurant-schema";
 import { StatusCodes } from "http-status-codes";
 import { Response } from "express";
 import {tables} from "../schema/table-schema";
-import {eq} from "drizzle-orm";
+import {and, eq} from "drizzle-orm";
 import {handleError} from "../service/error-handling";
 
 
@@ -72,19 +72,34 @@ export const addTableToRestaurant = async (req: CustomRequest, res: Response) =>
             return handleError(res, "Missing required fields", StatusCodes.BAD_REQUEST);
         }
 
-        // Optional: Check if a restaurant exists first
+        // Check if restaurant exists
         const restaurantExists = await db.select().from(restaurants).where(eq(restaurants.id, restaurantId));
         if (restaurantExists.length === 0) {
             return handleError(res, "Restaurant not found", StatusCodes.NOT_FOUND);
         }
 
-        const newTable = await db.insert(tables).values({
+        // Check if the table number already exists FOR THIS restaurant
+        const tableConflict = await db.select()
+            .from(tables)
+            .where(
+                and(
+                    eq(tables.restaurantId, restaurantId),
+                    eq(tables.tableNumber, tableNumber)
+                )
+            );
+
+        if (tableConflict.length > 0) {
+            return handleError(res, `Table number ${tableNumber} already exists in this restaurant`, StatusCodes.CONFLICT);
+        }
+
+        // Insert if all checks pass
+        const [newTable] = await db.insert(tables).values({
             restaurantId,
             tableNumber,
             capacity
         }).returning();
 
-        res.status(StatusCodes.CREATED).json(newTable[0]);
+        res.status(StatusCodes.CREATED).json(newTable);
     } catch (error) {
         handleError(res, "Failed to add table", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
     }
