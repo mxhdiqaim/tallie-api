@@ -59,7 +59,7 @@ export const getRestaurantReservationsByDate = async (req: CustomRequest, res: R
                     gte(reservations.startTime, dayStart.toJSDate()),
                     lte(reservations.startTime, dayEnd.toJSDate())
                 )
-            );
+            ).orderBy(reservations.reservationStatus, reservations.startTime);;
 
         res.status(StatusCodes.OK).json(results);
     } catch (error) {

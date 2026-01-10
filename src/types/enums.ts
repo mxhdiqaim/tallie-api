@@ -11,4 +11,5 @@ export const ReservationStatusEnum = {
     SEATED: "seated",
     COMPLETED: "completed",
     CANCELLED: "cancelled",
+    WAITLIST: "waitlist",
 } as const;

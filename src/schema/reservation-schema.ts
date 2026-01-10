@@ -2,7 +2,7 @@ import {pgTable, uuid, timestamp, integer, varchar, pgEnum} from "drizzle-orm/pg
 import { tables } from "./table-schema";
 import { restaurants } from "./restaurant-schema";
 
-export const reservationStatusEnum = pgEnum('reservationStatus', ['pending', 'confirmed', 'seated', 'completed', 'cancelled']);
+export const reservationStatusEnum = pgEnum('reservationStatus', ['pending', 'confirmed', 'seated', 'completed', 'cancelled', "waitlist"]);
 
 export const reservations = pgTable('reservations', {
     id: uuid("id").defaultRandom().primaryKey(),

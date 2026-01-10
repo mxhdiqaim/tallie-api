@@ -2,7 +2,7 @@ import { Response } from "express";
 import { DateTime } from 'luxon';
 import { CustomRequest } from "../types/express";
 import { restaurants } from "../schema/restaurant-schema";
-import {and, desc, eq, gte} from "drizzle-orm";
+import {and, desc, eq, gte, lte} from "drizzle-orm";
 import db from "../db";
 import { tables } from "../schema/table-schema";
 import { isTableBusy } from "../service/is-table-busy";
@@ -59,59 +59,12 @@ export const getCustomerReservations = async (req: CustomRequest, res: Response)
 };
 
 /**
- * @description Modify a reservation (Update status, time, or party size)
- * @route PATCH /api/v1/reservations/:id
- */
-export const updateReservation = async (req: CustomRequest, res: Response) => {
-    try {
-        const { id } = req.params;
-        const { partySize, startTimeISO, durationMinutes } = req.body;
-
-        // Fetch existing reservation
-        const [existing] = await db.select().from(reservations).where(eq(reservations.id, id));
-        if (!existing) return handleError(res, "Reservation not found", StatusCodes.NOT_FOUND);
-
-        const updateData: any = {};
-
-        // Handle Status Update
-        // if (reservationStatus) updateData.reservationStatus = reservationStatus;
-
-        // Handle Time/Capacity Changes
-        if (startTimeISO || partySize || durationMinutes) {
-            const newStart = startTimeISO ? DateTime.fromISO(startTimeISO) : DateTime.fromJSDate(existing.startTime);
-            const newDuration = durationMinutes ||
-                DateTime.fromJSDate(existing.endTime).diff(DateTime.fromJSDate(existing.startTime), 'minutes').minutes;
-            const newEnd = newStart.plus({ minutes: newDuration });
-            const newSize = partySize || existing.partySize;
-
-            // Check if the table is still free for the NEW time (excluding this reservation itself)
-            const busy = await isTableBusy(existing.tableId, newStart.toJSDate(), newEnd.toJSDate(), id);
-
-            if (busy) return handleError(res, "The table is already booked for this new time", StatusCodes.CONFLICT);
-
-            updateData.startTime = newStart.toJSDate();
-            updateData.endTime = newEnd.toJSDate();
-            updateData.partySize = newSize;
-        }
-
-        const [updated] = await db.update(reservations)
-            .set(updateData)
-            .where(eq(reservations.id, id))
-            .returning();
-
-        res.status(StatusCodes.OK).json(updated);
-    } catch (error) {
-        handleError(res, "Update failed", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
-    }
-};
-
-/**
  * @description Create a reservation with validation for hours, capacity, and double-booking
  * @route POST /api/v1/reservations/create
  */
 export const createReservation = async (req: CustomRequest, res: Response) => {
     try {
-        const { restaurantId, partySize, startTimeISO, durationMinutes, customerName, customerPhone } = req.body;
+        const { restaurantId, partySize, startTimeISO, durationMinutes, customerName, customerPhone, allowWaitlist } = req.body;
 
         // Parse requested times
         const requestedStart = DateTime.fromISO(startTimeISO);
@@ -177,29 +130,47 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
                     gte(tables.capacity, partySize)
                 )
             )
-            .orderBy(tables.capacity); // Tries to fill the smallest suitable table first
+            .orderBy(tables.capacity);
 
         if (potentialTables.length === 0) {
             return handleError(
                 res,
-                `This restaurant does not have any tables that can accommodate party ${partySize} people.`,
+                `This restaurant does not have any tables that can accommodate ${partySize} people party.`,
                 StatusCodes.BAD_REQUEST
             );
         }
 
         // Availability Check (Double-Booking Prevention)
         let assignedTableId: string | null = null;
-
         for (const table of potentialTables) {
             const busy = await isTableBusy(table.id, requestedStart.toJSDate(), requestedEnd.toJSDate());
             if (!busy) {
                 assignedTableId = table.id;
-                break; // Found a free table, stop looking
+                break;
             }
         }
 
+        // Handle Waitlist Logic
         if (!assignedTableId) {
-            return handleError(res, "No tables available", StatusCodes.CONFLICT);
+            if (allowWaitlist) {
+                const [waitlistEntry] = await db.insert(reservations).values({
+                    restaurantId,
+                    tableId: potentialTables[0]?.id, // Link to a compatible table type as a placeholder
+                    customerName,
+                    customerPhone: String(customerPhone),
+                    partySize,
+                    startTime: requestedStart.toJSDate(),
+                    endTime: requestedEnd.toJSDate(),
+                    reservationStatus: ReservationStatusEnum.WAITLIST
+                }).returning();
+
+                return res.status(StatusCodes.CREATED).json({
+                    message: "No tables available, you have been added to the waitlist.",
+                    data: waitlistEntry
+                });
+            }
+
+            return handleError(res, "No tables available for this time.", StatusCodes.CONFLICT);
         }
 
         // Finalize Reservation
@@ -227,6 +198,54 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
 };
 
 /**
+ * @description Modify a reservation (Update status, time, or party size)
+ * @route PATCH /api/v1/reservations/:id
+ */
+export const updateReservation = async (req: CustomRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { partySize, startTimeISO, durationMinutes } = req.body;
+
+        // Fetch existing reservation
+        const [existing] = await db.select().from(reservations).where(eq(reservations.id, id));
+        if (!existing) return handleError(res, "Reservation not found", StatusCodes.NOT_FOUND);
+
+        const updateData: any = {};
+
+        // Handle Status Update
+        // if (reservationStatus) updateData.reservationStatus = reservationStatus;
+
+        // Handle Time/Capacity Changes
+        if (startTimeISO || partySize || durationMinutes) {
+            const newStart = startTimeISO ? DateTime.fromISO(startTimeISO) : DateTime.fromJSDate(existing.startTime);
+            const newDuration = durationMinutes ||
+                DateTime.fromJSDate(existing.endTime).diff(DateTime.fromJSDate(existing.startTime), 'minutes').minutes;
+            const newEnd = newStart.plus({ minutes: newDuration });
+            const newSize = partySize || existing.partySize;
+
+            // Check if the table is still free for the NEW time (excluding this reservation itself)
+            const busy = await isTableBusy(existing.tableId, newStart.toJSDate(), newEnd.toJSDate(), id);
+
+            if (busy) return handleError(res, "The table is already booked for this new time", StatusCodes.CONFLICT);
+
+            updateData.startTime = newStart.toJSDate();
+            updateData.endTime = newEnd.toJSDate();
+            updateData.partySize = newSize;
+        }
+
+        const [updated] = await db.update(reservations)
+            .set(updateData)
+            .where(eq(reservations.id, id))
+            .returning();
+
+        res.status(StatusCodes.OK).json(updated);
+    } catch (error) {
+        handleError(res, "Update failed", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
+    }
+};
+
+
+/**
  * @description Cancel a reservation (Soft cancel by updating status)
  * @route DELETE /api/v1/reservation/:id
  */
@@ -241,7 +260,32 @@ export const cancelReservation = async (req: CustomRequest, res: Response) => {
 
         if (!cancelled) return handleError(res, "Reservation not found", StatusCodes.NOT_FOUND);
 
-        res.status(StatusCodes.OK).json({ message: "Reservation cancelled", data: cancelled });
+        // Look for Waitlisted people for the SAME time and SAME restaurant
+        const waitlisted = await db.select().from(reservations)
+            .where(and(
+                eq(reservations.restaurantId, cancelled.restaurantId),
+                eq(reservations.reservationStatus, ReservationStatusEnum.WAITLIST),
+                // Only find people whose time overlaps with the now-vacant slot
+                lte(reservations.startTime, cancelled.endTime),
+                gte(reservations.endTime, cancelled.startTime)
+            ))
+            .orderBy(reservations.createdAt); // First come, first served
+
+        // Check if any waitlisted entry fits the now-free table
+        for (const entry of waitlisted) {
+            const busy = await isTableBusy(cancelled.tableId, entry.startTime, entry.endTime);
+            if (!busy) {
+                // Promote to Confirmed!
+                await db.update(reservations)
+                    .set({ reservationStatus: ReservationStatusEnum.CONFIRMED, tableId: cancelled.tableId })
+                    .where(eq(reservations.id, entry.id));
+
+                console.log(`Promoted customer ${entry.customerName} from waitlist.`);
+                break; // Only promote one person for this specific cancellation
+            }
+        }
+
+        res.status(StatusCodes.OK).json({ message: "Cancelled and waitlist updated" });
     } catch (error) {
         handleError(res, "Cancellation failed", StatusCodes.INTERNAL_SERVER_ERROR, error instanceof Error ? error : undefined);
     }

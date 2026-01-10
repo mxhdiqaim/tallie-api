@@ -1,0 +1,1 @@
+ALTER TYPE "public"."reservationStatus" ADD VALUE 'waitlist';
