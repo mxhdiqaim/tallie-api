@@ -1,7 +1,6 @@
 import { createClient } from "redis";
 import { getEnvVariable } from "../utils";
 import { NODE_ENV } from "../db";
-import { readFileSync } from "fs";
 
 let redisClient: ReturnType<typeof createClient>;
 
@@ -9,9 +8,7 @@ if (NODE_ENV === "production") {
     const redisHost = getEnvVariable("REDIS_HOST");
     const redisPort = getEnvVariable("REDIS_PORT");
 
-    // Read password from a Docker secret file
-    const passwordFile = getEnvVariable("REDIS_PASSWORD");
-    const redisPassword = readFileSync(passwordFile, "utf8").trim();
+    const redisPassword = getEnvVariable("REDIS_PASSWORD");
 
     const encodedPassword = encodeURIComponent(redisPassword);
 
