@@ -519,3 +519,58 @@ Our current waitlist only promotes when someone cancels.
 * **The Logic:** If a table is due to leave in 15 minutes, the system could text the next person on the waitlist: *"Your table will likely be ready in 15 minutes, please head toward the restaurant."* This reduces "Dead Table Time" between seating.
 
 ---
+
+## Scaling to Enterprise Level
+
+### 1. Database Scaling: Multi-Tenancy
+
+As we add thousands of restaurants, a single database table for reservations will eventually become a bottleneck.
+
+* **The Strategy:** Implement **Database Sharding** or **Partitioning**.
+* **The Logic:** Use **PostgreSQL Table Partitioning** based on `restaurantId`. This allows the database to ignore millions of rows belonging to other restaurants and only scan the data relevant to the specific restaurant being queried.
+* **Assumption:** Data is geographically concentrated. We could shard by region (e.g., `africa-south-db`, `eu-west-db`) to keep data close to the physical restaurant for lower latency.
+
+---
+
+### 2. Intelligent Caching: The Global vs. Local Split
+
+A global Redis instance will eventually run out of memory or hit connection limits.
+
+* **The Strategy:** **Distributed Redis Clusters**.
+* **The Logic:** Use a "Sidecar" cache approach. Each region has its own Redis cluster.
+* **Advanced Optimisation:** Use **Redis Bloom Filters** for availability. A Bloom Filter can tell the system *immediately* if a restaurant is fully booked for a specific date without performing a complex query or even a standard cache lookup. This is incredibly efficient for "Search as you type" features.
+
+---
+
+### 3. Compute Scaling: Microservices & Event-Driven Logic
+
+Currently, the API handles everything (Auth, Reservations, Notifications, Cron). This should be broken down.
+
+* **The Strategy:** **Event Sourcing with Message Queues (RabbitMQ/Kafka)**.
+* **The Logic:** When a user clicks "Book", the API simply drops a message into a queue.
+* **Reservation Worker**: Picks up the message and handles the DB logic.
+* **Notification Worker**: Handles the Email/SMS API (so the user doesn't wait or SMS for the email to send before getting a "Success" screen).
+* **Analytics Worker**: Updates the restaurant's daily reports.
+* **Benefit:** If the Notification service goes down, people can still book tables. The system becomes "Fault Tolerant."
+
+---
+
+### 4. Search Scaling: Dedicated Search Engine
+
+SQL `WHERE` clauses are not meant for "Discovery" (e.g. "Find me Chicken Republic restaurants near me with a table for 4 at 7 PM").
+
+* **The Strategy:** **Elasticsearch or Meilisearch integration**.
+* **The Logic:** Sync your restaurant and table availability to an indexed search engine.
+* **The Benefit:** Elasticsearch is designed for high speed filtering across multiple dimensions (price, location, availability) simultaneously, which is much faster than standard SQL for discovery-based queries.
+
+---
+
+### Summary of Scaling Evolution
+
+| Component | Current (Small Scale) | Enterprise (Large Scale)                    |
+| --- | --- |---------------------------------------------|
+| **Database** | Single Postgres Instance | Partitioned/Sharded Postgres                |
+| **Caching** | Local Redis | Distributed Redis Cluster + Bloom Filters   |
+| **Logic** | Monolith API | Microservices (Booking, Auth, Notification) |
+| **Notifications** | In-process (Async) | Event-driven (Kafka/RabbitMQ)               |
+| **Cron Jobs** | `node-cron` in-app | Distributed Cron (e.g., BullMQ or Temporal) |
