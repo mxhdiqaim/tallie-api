@@ -29,7 +29,7 @@ For a quick and isolated development environment, you can use Docker.
    DB_NAME=some_db
    
    ## Other local env variables
-   APP_URL=api.tallie.com
+   APP_URL=app.tallie.com
    
    # Redis
    REDIS_HOST=redis_cache
