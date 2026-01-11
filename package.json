@@ -41,8 +41,7 @@
     "passport-local": "^1.0.0",
     "pg": "^8.16.3",
     "rate-limit-redis": "^4.3.1",
-    "redis": "^5.10.0",
-    "resend": "^6.7.0"
+    "redis": "^5.10.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

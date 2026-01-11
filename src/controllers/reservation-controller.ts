@@ -77,9 +77,9 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
             return handleError(res, `Peak hour limit: ${maxAllowed} mins`, StatusCodes.BAD_REQUEST);
         }
 
-        // if (durationMinutes < 45) {
-        //     return handleError(res, "Reservations must be at least 45 minutes.", StatusCodes.BAD_REQUEST);
-        // }
+        if (durationMinutes < 15) {
+            return handleError(res, "Minimum reservation duration is 15 minutes.", StatusCodes.BAD_REQUEST);
+        }
 
 
         if (!requestedStart.isValid) {
@@ -134,15 +134,15 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
             .orderBy(tables.capacity);
 
         if (potentialTables.length === 0) {
-            return handleError(
-                res,
-                `This restaurant does not have any tables that can accommodate ${partySize} people party.`,
-                StatusCodes.BAD_REQUEST
-            );
+            return handleError(res, `No tables found that can accommodate a party of ${partySize}.`, StatusCodes.BAD_REQUEST);
         }
 
-        // Availability Check (Double-Booking Prevention)
         let assignedTableId: string | null = null;
+
+        // The loop will now naturally pick the "Best Fit"
+        // Example: Party of 2.
+        // Database returns: [Table(Cap: 2), Table(Cap: 2), Table(Cap: 4), Table(Cap: 8)]
+        // It will try both 2-seaters before "wasting" the 4-seater.
         for (const table of potentialTables) {
             const busy = await isTableBusy(table.id, requestedStart.toJSDate(), requestedEnd.toJSDate());
             if (!busy) {
