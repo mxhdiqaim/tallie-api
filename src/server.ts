@@ -1,29 +1,19 @@
-// import "./config/instrument";
-// import * as Sentry from "@sentry/node";
 import cors from "cors";
 import express from "express";
 import http from "http";
 import morgan from "morgan";
-import "./config/auth-config";
 import path from "path";
-import configureSession from "./config/session-config";
 import routes from "./routes";
 import { getEnvVariable } from "./utils";
 import {initCronJobs} from "./service/cron-service";
-// import { initializeSentry } from "./config/sentry-config";
 
 export const app = express();
 
 initCronJobs();
 
-// Initialise Sentry
-// const SENTRY_DSN = getEnvVariable("SENTRY_DSN");
-// initializeSentry(SENTRY_DSN);
-
 app.set("trust proxy", 1);
 
 const NODE_ENV = getEnvVariable("NODE_ENV");
-const LANDING_PAGE = getEnvVariable("LANDING_PAGE");
 const APP_URL = getEnvVariable("APP_URL");
 
 const URL =
@@ -33,10 +23,7 @@ const URL =
             "http://localhost:3001",
             "http://localhost:3002",
         ]
-        : [`https://${LANDING_PAGE}`, `https://${APP_URL}`];
-
-/** Session */
-configureSession(app);
+        : [`https://${APP_URL}`];
 
 const corsOptions = {
     origin: URL, // FE origins

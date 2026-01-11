@@ -1,5 +1,4 @@
-import { Response } from "express";
-import {CustomRequest} from "../types/express";
+import { Response, Request } from "express";
 import {getAvailableSlots} from "../service/availability-service";
 import {StatusCodes} from "http-status-codes";
 import {handleError} from "../service/error-handling";
@@ -12,7 +11,7 @@ import {handleError} from "../service/error-handling";
     * @query partySize - Number of people
     * @query duration - Duration of the reservation in minutes (optional, default 60)
 */
-export const checkAvailability = async (req: CustomRequest, res: Response) => {
+export const checkAvailability = async (req: Request, res: Response) => {
     try {
         const { restaurantId, date, partySize, duration } = req.query;
 

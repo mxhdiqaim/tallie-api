@@ -1,8 +1,7 @@
-import {CustomRequest} from "../types/express";
 import db from '../db';
 import {restaurants} from "../schema/restaurant-schema";
 import { StatusCodes } from "http-status-codes";
-import { Response } from "express";
+import { Response, Request } from "express";
 import {tables} from "../schema/table-schema";
 import {and, eq, gte, lte} from "drizzle-orm";
 import {handleError} from "../service/error-handling";
@@ -13,7 +12,7 @@ import {reservations} from "../schema/reservation-schema";
  * @description Get all restaurants
  * @route GET /api/v1/restaurants
  */
-export const getAllRestaurants = async (req: CustomRequest, res: Response) => {
+export const getAllRestaurants = async (req: Request, res: Response) => {
     try {
         const allRestaurants = await db.select().from(restaurants);
         res.status(StatusCodes.OK).json(allRestaurants);
@@ -26,7 +25,7 @@ export const getAllRestaurants = async (req: CustomRequest, res: Response) => {
  * @description Get all reservations for a restaurant on a specific date
  * @route GET /api/v1/restaurants/:id/reservations?date=YYYY-MM-DD
  */
-export const getRestaurantReservationsByDate = async (req: CustomRequest, res: Response) => {
+export const getRestaurantReservationsByDate = async (req: Request, res: Response) => {
     try {
         const { id: restaurantId } = req.params;
         const { date } = req.query;
@@ -72,7 +71,7 @@ export const getRestaurantReservationsByDate = async (req: CustomRequest, res: R
     * @route GET /api/v1/restaurant/:id/tables
     * @param id - Restaurant ID
  */
-export const getAllRestaurantTables = async (req: CustomRequest, res: Response) => {
+export const getAllRestaurantTables = async (req: Request, res: Response) => {
     try {
         const { id: restaurantId } = req.params;
 
@@ -96,7 +95,7 @@ export const getAllRestaurantTables = async (req: CustomRequest, res: Response) 
  * @description Create a restaurant
  * @route POST /api/v1/restaurant/create
  */
-export const createRestaurant = async (req: CustomRequest, res: Response) =>{
+export const createRestaurant = async (req: Request, res: Response) =>{
     try {
         const { name, openingTime, closingTime } = req.body;
 
@@ -122,7 +121,7 @@ export const createRestaurant = async (req: CustomRequest, res: Response) =>{
  * @body { tableNumber: number, capacity: number }
  * @param id - Restaurant ID
  */
-export const addTableToRestaurant = async (req: CustomRequest, res: Response) => {
+export const addTableToRestaurant = async (req: Request, res: Response) => {
     try {
         const { id: restaurantId } = req.params;
         const { tableNumber, capacity } = req.body;

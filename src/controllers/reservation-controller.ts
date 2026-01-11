@@ -1,6 +1,5 @@
-import { Response } from "express";
+import { Response, Request } from "express";
 import { DateTime } from 'luxon';
-import { CustomRequest } from "../types/express";
 import { restaurants } from "../schema/restaurant-schema";
 import {and, desc, eq, gte, lte} from "drizzle-orm";
 import db from "../db";
@@ -12,13 +11,14 @@ import { handleError } from "../service/error-handling";
 import {ReservationStatusEnum} from "../types/enums";
 import {getPeakLimit} from "../helper";
 import {NotificationService} from "../service/notification-service";
+import {invalidateAvailabilityCache} from "../helper/cache-helper";
 
 
 /**
  * @description Get all reservations for a customer by phone number
  * @route GET /api/v1/reservations/customer/:phone
  */
-export const getCustomerReservations = async (req: CustomRequest, res: Response) => {
+export const getCustomerReservations = async (req: Request, res: Response) => {
     try {
         const { phone } = req.params;
 
@@ -63,7 +63,7 @@ export const getCustomerReservations = async (req: CustomRequest, res: Response)
  * @description Create a reservation with validation for hours, capacity, and double-booking
  * @route POST /api/v1/reservations/create
  */
-export const createReservation = async (req: CustomRequest, res: Response) => {
+export const createReservation = async (req: Request, res: Response) => {
     try {
         const { restaurantId, partySize, startTimeISO, durationMinutes, customerName, customerPhone, allowWaitlist } = req.body;
 
@@ -186,6 +186,12 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
             reservationStatus: ReservationStatusEnum.CONFIRMED
         }).returning();
 
+        // After successful booking, invalidate cache for that restaurant and date
+        const bookedDate = requestedStart.toISODate();
+        if (bookedDate) {
+            invalidateAvailabilityCache(restaurantId, bookedDate);
+        }
+
         // Trigger Mock Notification
         await NotificationService.send({
             customerName: newBooking.customerName,
@@ -211,7 +217,7 @@ export const createReservation = async (req: CustomRequest, res: Response) => {
  * @description Modify a reservation (Update status, time, or party size)
  * @route PATCH /api/v1/reservations/:id
  */
-export const updateReservation = async (req: CustomRequest, res: Response) => {
+export const updateReservation = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { partySize, startTimeISO, durationMinutes } = req.body;
@@ -259,7 +265,7 @@ export const updateReservation = async (req: CustomRequest, res: Response) => {
  * @description Cancel a reservation (Soft cancel by updating status)
  * @route DELETE /api/v1/reservation/:id
  */
-export const cancelReservation = async (req: CustomRequest, res: Response) => {
+export const cancelReservation = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
@@ -268,7 +274,11 @@ export const cancelReservation = async (req: CustomRequest, res: Response) => {
             .where(eq(reservations.id, id))
             .returning();
 
-        if (!cancelled) return handleError(res, "Reservation not found", StatusCodes.NOT_FOUND);
+        if (!cancelled) return handleError(res, "Reservation not found", StatusCodes.NOT_FOUND)
+
+        // Invalidate Cache for the date of the cancelled reservation
+        const cancelledDate = DateTime.fromJSDate(cancelled.startTime).toISODate()!;
+        await invalidateAvailabilityCache(cancelled.restaurantId, cancelledDate);
 
         // Look for Waitlisted people for the SAME time and SAME restaurant
         const waitlisted = await db.select().from(reservations)
