@@ -10,7 +10,7 @@ if (NODE_ENV === "production") {
     const redisPort = getEnvVariable("REDIS_PORT");
 
     // Read password from a Docker secret file
-    const passwordFile = getEnvVariable("REDIS_PASSWORD_FILE");
+    const passwordFile = getEnvVariable("REDIS_PASSWORD");
     const redisPassword = readFileSync(passwordFile, "utf8").trim();
 
     const encodedPassword = encodeURIComponent(redisPassword);
