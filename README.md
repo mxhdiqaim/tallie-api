@@ -454,3 +454,68 @@ Currently, `getPeakLimit` is a global utility.
 * **The Problem:** Every restaurant in the system follows the same peak hour definition.
 * **Impact:** A breakfast café has different peak hours than a late-night cocktail bar. The logic should eventually be moved into the `restaurants` table as a configuration.
 * **Solution for Scale:** Add `peakStartTime`, `peakEndTime`, and `peakDurationLimit` fields to the `restaurants` table.
+
+## What you would improve with more time
+
+### 1. Intelligent "Tetris" Seating (Global Optimisation)
+
+Currently, the seating has "first-come, first-served." I would implement a **Constraint Satisfaction Solver**.
+
+* **The Improvement:** Instead of just picking the first available table, the system would simulate different seating arrangements for the whole night.
+* **The Goal:** To minimise "un-bookable" gaps. For example, if moving a 7:00 PM booking from Table 1 to Table 2 opens up a 4-hour block for a large party, the system should suggest that "shuffle" to the manager.
+
+---
+
+### 2. Table Combining Logic (Dynamic Inventory)
+
+I would move away from "Static Tables" and introduce **Adjacency Mapping**.
+
+* **The Improvement:** Define which tables are physically next to each other in the database.
+* **The Logic:** If a party of 4 arrives and no 4-seater is open, the system would check if `Table 1 (Cap 2)` and `Table 2 (Cap 2)` are both free and adjacent. If so, it would "virtually merge" them for that reservation.
+
+---
+
+### 3. Machine Learning for "No-Show" Prediction
+
+Not all reservations are equal. Some customers have a history of not showing up.
+
+* **The Improvement:** Use historical data to assign a "Reliability Score" to customers.
+* **The Logic:** If a "Low Reliability" customer books a prime-time slot, the system could **Overbook** by a small percentage (similar to airlines) or require a non-refundable deposit.
+
+---
+
+### 4. Granular Restaurant Configuration (The Multi-Tenant Upgrade)
+
+Currently, peak hours and duration limits are somewhat global.
+
+* **The Improvement:** Move all business rules into a JSONB configuration column in the `restaurants` table.
+* **The Logic:** Allow a Breakfast Café to define peak hours as (8:00 AM - 10:00 AM) and a Nightclub to define them as (11:00 PM - 2:00 AM), with different duration limits for each.
+
+---
+
+### 5. Advanced Redis Caching (Bloom Filters)
+
+As the number of restaurants grows, checking Redis for "No Availability" can become slow.
+
+* **The Improvement:** Implement **Redis Bloom Filters**.
+* **The Logic:** Before even hitting the database or the standard cache, a Bloom Filter can tell the system with 100% certainty if a restaurant has *zero* tables available for a certain day. This saves thousands of unnecessary database hits during holiday surges.
+
+---
+
+### 6. Real-Time "Live Map" via WebSockets
+
+Static lists are great for APIs, but restaurant managers need a visual.
+
+* **The Improvement:** Integrate **Socket.io**.
+* **The Logic:** Create a real-time floor plan where tables change colour (Green to Red) the moment a reservation starts, a customer is seated, or a table becomes "Dirty" and needs clearing.
+
+---
+
+### 7. Multi-Phase Waitlist (Pre-emptive Promotion)
+
+Our current waitlist only promotes when someone cancels.
+
+* **The Improvement:** Implement "Predicted Availability."
+* **The Logic:** If a table is due to leave in 15 minutes, the system could text the next person on the waitlist: *"Your table will likely be ready in 15 minutes, please head toward the restaurant."* This reduces "Dead Table Time" between seating.
+
+---
