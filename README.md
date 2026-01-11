@@ -387,3 +387,70 @@ For a quick and isolated development environment, you can use Docker.
 
 * **Fixed Tables:** I assume tables are stationary. The current version does not support "Table Joining" (merging two 2-seaters to make a 4-seater) unless explicitly defined as a unique "Table" in the database.
 * **No Manual Overrides:** We assume the system has total authority over availability. (In a future version, a "Manager Override" might bypass these rules).
+
+## Known limitations
+
+### 1. No Table Combining (Static Inventory)
+
+The system treats every table as a fixed entity.
+
+* **The Problem:** If you have two vacant 2-seater tables, the system cannot "merge" them to accommodate a party of 4.
+* **Impact:** You might turn away a larger party even if you have the physical floor space to accommodate them by moving furniture.
+* **Workaround:** Managers must manually define "Combos" as separate table entries in the database.
+
+---
+
+### 2. Lack of "Shuffling" Optimisation
+
+The seating algorithm is "Greedy" it picks the best available table at the moment the request is made.
+
+* **The Problem:** It doesn't look at the "Tetris" of the whole night. For example, it might assign a party of 2 to a 2-seater that is needed for a confirmed booking 30 minutes later, even if another 2-seater was free for the whole night.
+* **Impact:** This can lead to "Swiss Cheese" availability, where you have many small gaps that are too short for a full reservation.
+
+---
+
+### 3. Redis `KEYS` Command Performance
+
+In the `invalidateAvailabilityCache` helper, we use the Redis `KEYS` command to find keys to delete.
+
+* **The Problem:** The `KEYS` command can block the Redis event loop if the database contains millions of keys.
+* **Impact:** In a massive multi-restaurant setup, this could cause temporary latency spikes.
+* **Solution for Scale:** In a high-volume production environment, this should be refactored to use `SCAN` or a dedicated "Sets" approach to track keys by restaurant.
+
+---
+
+### 4. Simplified "Overnight" Support
+
+While the system handles hours like 6:00 PM to 2:00 AM, it assumes a reservation stays within a single "business day" logic.
+
+* **The Problem:** It does not currently support multi-day bookings (e.g. a hotel-style stay) or complex split shifts (opening 12–3 PM, closing, then reopening 6–11 PM).
+* **Impact:** Restaurants with midday closures would need a more complex `operatingHours` schema.
+
+---
+
+### 5. Race Conditions in Waitlist Promotion
+
+The promotion logic is triggered *after* a cancellation.
+
+* **The Problem:** If two people cancel at the exact same millisecond, there is a theoretical window where the same waitlisted guest could be processed twice or a race condition could occur during table assignment.
+* **Impact:** Extremely rare in low-to-mid traffic, but requires database **Transactions** or **Row Level Locking** (`SELECT ... FOR UPDATE`) to be 100% bulletproof at scale.
+
+---
+
+### 6. No Real-Time "Heartbeat" for Pending Bookings
+
+The current `ReservationStatusEnum.PENDING` relies on a Cron job to clean up.
+
+* **The Problem:** If a user starts a booking but never finishes, that table is "locked" until the next Cron cycle runs (usually every 10–15 minutes).
+* **Impact:** Other users might see the table as unavailable for a few minutes even though the first user has already abandoned their browser tab or closed the mobile application.
+* **Solution for Scale:** Implement a WebSocket or polling-based system to keep the reservation alive only while the user is actively engaged.
+
+---
+
+### 7. Global Peak Hour Rules
+
+Currently, `getPeakLimit` is a global utility.
+
+* **The Problem:** Every restaurant in the system follows the same peak hour definition.
+* **Impact:** A breakfast café has different peak hours than a late-night cocktail bar. The logic should eventually be moved into the `restaurants` table as a configuration.
+* **Solution for Scale:** Add `peakStartTime`, `peakEndTime`, and `peakDurationLimit` fields to the `restaurants` table.
