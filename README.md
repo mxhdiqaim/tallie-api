@@ -304,3 +304,86 @@ For a quick and isolated development environment, you can use Docker.
 * **Time Management**: Powered by **Luxon** for accurate timezone and overnight hours (e.g. 6 PM to 2 AM) handling.
 * **Background Tasks**: `node-cron` monitors and updates reservation states automatically, it runs every 15min.
 * **Error Handling**: Centralised middleware for consistent error responses.
+
+## Design decisions and assumptions
+
+[//]: # (* **Soft Deletes**: Reservations are soft-deleted to maintain historical data integrity.)
+
+[//]: # (* **Waitlist Promotion**: Automatically promotes waitlisted reservations when cancellations occur.)
+
+[//]: # (* **Table Uniqueness**: Table numbers are unique per restaurant to avoid conflicts.)
+
+[//]: # (* **Optimistic Seating**: The system optimistically assigns tables to maximise seating efficiency.)
+
+[//]: # (* **Scalability**: Designed to handle high traffic with efficient caching and rate limiting.)
+
+[//]: # (* **Extensibility**: Modular architecture allows for the easy addition of new features in the future.)
+
+[//]: # (* **Security**: Basic input validation is implemented. However, further security measures &#40;e.g. authentication, authorisation&#41; should be considered for production use.)
+
+---
+
+### 1. Yield Management & Seating Optimisation
+
+**Decision:** The system implements a "Smallest-Fit First" algorithm using database-level sorting (`ORDER BY capacity ASC`).
+
+* **Assumption:** Restaurants want to preserve large tables for large parties to maximise revenue.
+* **Logic:** If a party of 2 requests a table, the system will bypass an available 8-seater to check if any 2-seaters are open. It only uses the 8-seater for the small party if it is the *only* option left.
+* **Benefit:** This prevents "fragmentation" of the dining room where large groups are turned away despite the restaurant being half-empty.
+
+---
+
+### 2. The Cache Strategy with Redis
+
+**Decision:** Availability checks are cached in Redis with a 5-minute TTL, but invalidated immediately on state changes.
+
+* **Assumption:** Users check availability far more often than they actually book. Availability calculation is "expensive" (involving multiple table joins and time-overlap math).
+* **Logic:** When a booking is created or cancelled, we trigger a "Cache Eviction" for that specific restaurant and date.
+* **Benefit:** This ensures that the search results are lightning-fast for 99% of users while maintaining "Strong Consistency" (users won't see a slot as available if it was just booked seconds ago).
+
+---
+
+### 3. Timezone and Operating Hours Handling
+
+**Decision:** All time calculations are handled via **Luxon** using ISO 8601 strings, with support for "Overnight Logic."
+
+* **Assumption:** Restaurants don't always close at midnight. Many stay open until 1:00 AM or 2:00 AM.
+* **Logic:** If `closingTime` (e.g., 02:00) is numerically less than `openingTime` (e.g., 18:00), the system assumes the closing time belongs to the *next* calendar day.
+* **Assumption:** The `startTimeISO` provided by the client includes the correct offset or is in UTC.
+
+---
+
+### 4. Waitlist Promotion Engine
+
+**Decision:** Promotion from the waitlist is handled as a "Side Effect" of cancellation.
+
+* **Assumption:** A "First-Come, First-Served" (FCFS) model is the fairest for customers.
+* **Logic:** When a cancellation occurs, the system specifically looks for waitlisted entries that "fit" into the exact time slot and table capacity that was just vacated.
+* **Benefit:** This automates the work for restaurant hosts, ensuring the table is filled immediately without manual intervention.
+* **Future Consideration:** We can implement a cronjob that periodically scans the waitlist to find "gaps" in the schedule that can be filled, but this is outside the scope of the current version.
+
+---
+
+### 5. Peak Hour Constraints
+
+**Decision:** Dynamic duration limits based on the time of day.
+
+* **Assumption:** Tables are more valuable during "Prime Time" (e.g., 7:00 PM - 9:00 PM).
+* **Logic:** The `getPeakLimit` utility caps how long a user can stay during high-traffic windows (90 min).
+* **Benefit:** This allows the restaurant to "turn" the table more times in one night, increasing total covers.
+
+---
+
+### 6. Relational Database Choice (PostgreSQL)
+
+**Decision:** Use of **PostgreSQL** with **Drizzle ORM** instead of NoSQL.
+
+* **Assumption:** Data integrity and ACID compliance are non-negotiable for bookings.
+* **Logic:** Double-booking is a "hard failure" in the hospitality industry. Relational constraints and transaction-safe updates ensure that a table cannot be assigned to two people at once, even if two requests hit the server at the exact same millisecond.
+
+---
+
+### 7. Assumptions on Table "Flexibility"
+
+* **Fixed Tables:** I assume tables are stationary. The current version does not support "Table Joining" (merging two 2-seaters to make a 4-seater) unless explicitly defined as a unique "Table" in the database.
+* **No Manual Overrides:** We assume the system has total authority over availability. (In a future version, a "Manager Override" might bypass these rules).
